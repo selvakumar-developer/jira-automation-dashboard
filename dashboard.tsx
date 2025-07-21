@@ -1,0 +1,617 @@
+"use client"
+
+import { useState } from "react"
+import {
+  Calendar,
+  Clock,
+  Users,
+  CheckCircle,
+  AlertCircle,
+  PlayCircle,
+  PauseCircle,
+  TrendingUp,
+  TrendingDown,
+  Filter,
+  Download,
+  RefreshCw,
+} from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Mock data for projects
+const projectsData = [
+  {
+    id: 1,
+    name: "E-commerce Platform",
+    status: "Active",
+    totalTasks: 45,
+    inProgress: 12,
+    pending: 8,
+    completed: 20,
+    blocked: 3,
+    testing: 2,
+    resources: 8,
+    avgCompletionTime: 4.2,
+    delayedTasks: 5,
+    onTimeCompletion: 85,
+    budget: 150000,
+    budgetUsed: 89000,
+    startDate: "2024-01-15",
+    endDate: "2024-06-30",
+    priority: "High",
+  },
+  {
+    id: 2,
+    name: "Mobile App Development",
+    status: "Active",
+    totalTasks: 32,
+    inProgress: 8,
+    pending: 5,
+    completed: 15,
+    blocked: 2,
+    testing: 2,
+    resources: 6,
+    avgCompletionTime: 3.8,
+    delayedTasks: 3,
+    onTimeCompletion: 78,
+    budget: 120000,
+    budgetUsed: 65000,
+    startDate: "2024-02-01",
+    endDate: "2024-07-15",
+    priority: "High",
+  },
+  {
+    id: 3,
+    name: "Data Analytics Dashboard",
+    status: "Planning",
+    totalTasks: 28,
+    inProgress: 6,
+    pending: 12,
+    completed: 8,
+    blocked: 1,
+    testing: 1,
+    resources: 4,
+    avgCompletionTime: 5.1,
+    delayedTasks: 2,
+    onTimeCompletion: 92,
+    budget: 80000,
+    budgetUsed: 25000,
+    startDate: "2024-03-01",
+    endDate: "2024-08-30",
+    priority: "Medium",
+  },
+  {
+    id: 4,
+    name: "Customer Portal",
+    status: "Active",
+    totalTasks: 38,
+    inProgress: 10,
+    pending: 6,
+    completed: 18,
+    blocked: 2,
+    testing: 2,
+    resources: 5,
+    avgCompletionTime: 3.5,
+    delayedTasks: 4,
+    onTimeCompletion: 88,
+    budget: 95000,
+    budgetUsed: 72000,
+    startDate: "2024-01-20",
+    endDate: "2024-05-30",
+    priority: "Medium",
+  },
+  {
+    id: 5,
+    name: "API Integration",
+    status: "Completed",
+    totalTasks: 22,
+    inProgress: 0,
+    pending: 0,
+    completed: 20,
+    blocked: 0,
+    testing: 2,
+    resources: 3,
+    avgCompletionTime: 2.8,
+    delayedTasks: 1,
+    onTimeCompletion: 95,
+    budget: 45000,
+    budgetUsed: 43000,
+    startDate: "2023-11-01",
+    endDate: "2024-02-15",
+    priority: "Low",
+  },
+]
+
+// Calculate overall metrics
+const totalProjects = projectsData.length
+const activeProjects = projectsData.filter((p) => p.status === "Active").length
+const totalTasks = projectsData.reduce((sum, p) => sum + p.totalTasks, 0)
+const totalCompleted = projectsData.reduce((sum, p) => sum + p.completed, 0)
+const totalInProgress = projectsData.reduce((sum, p) => sum + p.inProgress, 0)
+const totalPending = projectsData.reduce((sum, p) => sum + p.pending, 0)
+const totalBlocked = projectsData.reduce((sum, p) => sum + p.blocked, 0)
+const totalResources = projectsData.reduce((sum, p) => sum + p.resources, 0)
+const totalBudget = projectsData.reduce((sum, p) => sum + p.budget, 0)
+const totalBudgetUsed = projectsData.reduce((sum, p) => sum + p.budgetUsed, 0)
+const avgCompletionRate = Math.round((totalCompleted / totalTasks) * 100)
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "Active":
+      return "bg-green-500"
+    case "Planning":
+      return "bg-yellow-500"
+    case "Completed":
+      return "bg-blue-500"
+    case "On Hold":
+      return "bg-gray-500"
+    default:
+      return "bg-gray-500"
+  }
+}
+
+const getPriorityColor = (priority: string) => {
+  switch (priority) {
+    case "High":
+      return "destructive"
+    case "Medium":
+      return "default"
+    case "Low":
+      return "secondary"
+    default:
+      return "default"
+  }
+}
+
+export default function JiraDashboard() {
+  const [selectedProject, setSelectedProject] = useState<string>("all")
+  const [timeRange, setTimeRange] = useState<string>("30d")
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Project Dashboard</h1>
+            <p className="text-muted-foreground">
+              Comprehensive overview of all projects and their performance metrics
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={timeRange} onValueChange={setTimeRange}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="90d">Last 90 days</SelectItem>
+                <SelectItem value="1y">Last year</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon">
+              <Filter className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon">
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalProjects}</div>
+              <p className="text-xs text-muted-foreground">{activeProjects} active projects</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalTasks}</div>
+              <p className="text-xs text-muted-foreground">{avgCompletionRate}% completion rate</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Resources</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalResources}</div>
+              <p className="text-xs text-muted-foreground">Across all projects</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Budget Utilization</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{Math.round((totalBudgetUsed / totalBudget) * 100)}%</div>
+              <p className="text-xs text-muted-foreground">
+                ${totalBudgetUsed.toLocaleString()} of ${totalBudget.toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Task Status Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                Completed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{totalCompleted}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <PlayCircle className="h-4 w-4 text-blue-500" />
+                In Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{totalInProgress}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <PauseCircle className="h-4 w-4 text-yellow-500" />
+                Pending
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">{totalPending}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-500" />
+                Blocked
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{totalBlocked}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-purple-500" />
+                Testing
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">
+                {projectsData.reduce((sum, p) => sum + p.testing, 0)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="projects" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="projects">Project Overview</TabsTrigger>
+            <TabsTrigger value="resources">Resource Allocation</TabsTrigger>
+            <TabsTrigger value="performance">Performance Metrics</TabsTrigger>
+            <TabsTrigger value="timeline">Timeline Analysis</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="projects" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Project Status Overview</CardTitle>
+                <CardDescription>Detailed breakdown of all projects and their current status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Project Name</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Tasks</TableHead>
+                      <TableHead>Resources</TableHead>
+                      <TableHead>Budget</TableHead>
+                      <TableHead>Completion Rate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {projectsData.map((project) => (
+                      <TableRow key={project.id}>
+                        <TableCell className="font-medium">{project.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusColor(project.status)}>
+                            {project.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getPriorityColor(project.priority)}>{project.priority}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <Progress value={(project.completed / project.totalTasks) * 100} className="w-20" />
+                            <span className="text-xs text-muted-foreground">
+                              {Math.round((project.completed / project.totalTasks) * 100)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{project.totalTasks} total</div>
+                            <div className="text-muted-foreground">{project.completed} completed</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{project.resources}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>${project.budgetUsed.toLocaleString()}</div>
+                            <div className="text-muted-foreground">of ${project.budget.toLocaleString()}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            {project.onTimeCompletion >= 90 ? (
+                              <TrendingUp className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4 text-red-500" />
+                            )}
+                            {project.onTimeCompletion}%
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="resources" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resource Distribution</CardTitle>
+                  <CardDescription>Number of resources allocated per project</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {projectsData.map((project) => (
+                      <div key={project.id} className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium">{project.name}</div>
+                          <div className="text-sm text-muted-foreground">{project.status}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{project.resources}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resource Utilization</CardTitle>
+                  <CardDescription>Resource efficiency across projects</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {projectsData.map((project) => {
+                      const tasksPerResource = (project.totalTasks / project.resources).toFixed(1)
+                      const completionPerResource = (project.completed / project.resources).toFixed(1)
+
+                      return (
+                        <div key={project.id} className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{project.name}</span>
+                            <span className="text-sm text-muted-foreground">{tasksPerResource} tasks/resource</span>
+                          </div>
+                          <Progress value={(project.completed / project.totalTasks) * 100} className="h-2" />
+                          <div className="text-xs text-muted-foreground">
+                            {completionPerResource} completed tasks per resource
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Task Completion Times</CardTitle>
+                  <CardDescription>Average completion time and delays by project</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {projectsData.map((project) => (
+                      <div key={project.id} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">{project.name}</span>
+                          <div className="text-right">
+                            <div className="text-sm font-medium">{project.avgCompletionTime} days avg</div>
+                            <div className="text-xs text-muted-foreground">{project.delayedTasks} delayed tasks</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="flex-1 bg-green-100 h-2 rounded">
+                            <div
+                              className="bg-green-500 h-2 rounded"
+                              style={{ width: `${project.onTimeCompletion}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground w-12">{project.onTimeCompletion}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Project Health Score</CardTitle>
+                  <CardDescription>Overall project performance indicators</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {projectsData.map((project) => {
+                      const completionRate = (project.completed / project.totalTasks) * 100
+                      const budgetEfficiency = ((project.budget - project.budgetUsed) / project.budget) * 100
+                      const healthScore = Math.round(
+                        (completionRate + project.onTimeCompletion + Math.max(0, budgetEfficiency)) / 3,
+                      )
+
+                      return (
+                        <div key={project.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <div className="font-medium">{project.name}</div>
+                            <div className="text-sm text-muted-foreground">Health Score: {healthScore}/100</div>
+                          </div>
+                          <div className="text-right">
+                            <div
+                              className={`text-2xl font-bold ${
+                                healthScore >= 80
+                                  ? "text-green-600"
+                                  : healthScore >= 60
+                                    ? "text-yellow-600"
+                                    : "text-red-600"
+                              }`}
+                            >
+                              {healthScore >= 80 ? "🟢" : healthScore >= 60 ? "🟡" : "🔴"}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="timeline" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Project Timeline Analysis</CardTitle>
+                <CardDescription>Project schedules and milestone tracking</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {projectsData.map((project) => {
+                    const startDate = new Date(project.startDate)
+                    const endDate = new Date(project.endDate)
+                    const today = new Date()
+                    const totalDuration = endDate.getTime() - startDate.getTime()
+                    const elapsed = today.getTime() - startDate.getTime()
+                    const timeProgress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100))
+                    const taskProgress = (project.completed / project.totalTasks) * 100
+
+                    return (
+                      <div key={project.id} className="space-y-3 p-4 border rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-medium">{project.name}</h4>
+                          <Badge variant={getPriorityColor(project.priority)}>{project.priority}</Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Start Date:</span>
+                            <div>{startDate.toLocaleDateString()}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">End Date:</span>
+                            <div>{endDate.toLocaleDateString()}</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Time Progress</span>
+                            <span>{Math.round(timeProgress)}%</span>
+                          </div>
+                          <Progress value={timeProgress} className="h-2" />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span>Task Progress</span>
+                            <span>{Math.round(taskProgress)}%</span>
+                          </div>
+                          <Progress value={taskProgress} className="h-2" />
+                        </div>
+
+                        <div className="flex justify-between items-center text-sm">
+                          <span
+                            className={`flex items-center gap-1 ${
+                              taskProgress >= timeProgress ? "text-green-600" : "text-red-600"
+                            }`}
+                          >
+                            {taskProgress >= timeProgress ? (
+                              <>
+                                <TrendingUp className="h-3 w-3" />
+                                On Track
+                              </>
+                            ) : (
+                              <>
+                                <TrendingDown className="h-3 w-3" />
+                                Behind Schedule
+                              </>
+                            )}
+                          </span>
+                          <span className="text-muted-foreground">{project.resources} resources assigned</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
