@@ -75,33 +75,123 @@ async function fetchProjects(): Promise<JiraProjectSearchResponse> {
 }
 
 const getGlobalTaskCounts = async () => {
+    // try {
+
+    //     const statusQueries = {
+    //         todo: 'statusCategory="To Do"',
+    //         inProgress: 'statusCategory="In Progress"',
+    //         done: 'statusCategory="Done"',
+    //         blocked: 'status="BLOCKED"',
+    //         testing: 'status="TESTING"',
+    //         total: 'project is not EMPTY'
+    //     };
+
+    //     const results: { [key: string]: string } = {};
+
+    //     for (const [key, jql] of Object.entries(statusQueries)) {
+    //         const response = await fetch(
+    //             `${BASE_URL}/search?` +
+    //             `jql=${encodeURIComponent(jql)}&maxResults=0`,
+    //             REQUEST_INIT
+    //         );
+
+    //         const data = await response.json();
+    //         results[key] = data.total;
+    //     }
+
+    //     console.log(results, "Global Task Counts: ");
+
+    //     return results;
+    // } catch (error) {
+    //     console.error('Error fetching global task counts:', error);
+    //     throw new Error('Failed to fetch global task counts');
+
+    // }
     try {
+        let allIssues = [];
+        let startAt = 0;
+        const maxResults = 100; // Try the highest value that works for your instance
 
-        const statusQueries = {
-            todo: 'statusCategory="To Do"',
-            inProgress: 'statusCategory="In Progress"',
-            done: 'statusCategory="Done"',
-            total: 'project is not EMPTY'
-        };
-
-        const results: { [key: string]: string } = {};
-
-        for (const [key, jql] of Object.entries(statusQueries)) {
+        // Fetch all issues using pagination
+        while (true) {
             const response = await fetch(
                 `${BASE_URL}/search?` +
-                `jql=${encodeURIComponent(jql)}&maxResults=0`,
+                `jql=${encodeURIComponent('project is not EMPTY')}&` +
+                `maxResults=${maxResults}&` +
+                `startAt=${startAt}&` +
+                `fields=status`,
                 REQUEST_INIT
             );
 
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const data = await response.json();
-            results[key] = data.total;
+            allIssues.push(...data.issues);
+
+            console.log(`Fetched ${allIssues.length}/${data.total} issues`);
+
+            // Break if we got all issues or less than maxResults (last page)
+            if (allIssues.length >= data.total || data.issues.length < maxResults) {
+                break;
+            }
+
+            startAt += maxResults;
         }
 
-        return results;
-    } catch (error) {
-        console.error('Error fetching global task counts:', error);
-        throw new Error('Failed to fetch global task counts');
+        // Count all statuses in a single pass
+        const results = {
+            todo: 0,
+            inProgress: 0,
+            done: 0,
+            blocked: 0,
+            testing: 0,
+            total: allIssues.length
+        };
 
+        allIssues.forEach((issue) => {
+            const status = issue.fields.status;
+            const statusName = status.name;
+            const statusCategory = status.statusCategory.name;
+            console.log('statusCategory: ', statusCategory);
+
+            // Count by status category
+            switch (statusCategory) {
+                case 'To Do':
+                    results.todo++;
+                    break;
+                case 'In Progress':
+                    results.inProgress++;
+                    break;
+                case 'Done':
+                    results.done++;
+                    break;
+                case 'Ready for Launch':
+                    results.done++;
+                    break;
+            }
+
+            // Count specific statuses
+            if (statusName === 'Blocked') {
+                results.blocked++;
+            } else if (statusName === 'Testing') {
+                results.testing++;
+            }
+        });
+
+        return results;
+
+    } catch (error) {
+        console.error('Error fetching status counts:', error);
+        return {
+            todo: 0,
+            inProgress: 0,
+            done: 0,
+            blocked: 0,
+            testing: 0,
+            total: 0
+        };
     }
 };
 
