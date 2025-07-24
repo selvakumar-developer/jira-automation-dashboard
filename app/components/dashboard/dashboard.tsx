@@ -314,24 +314,6 @@ export default function JiraDashboard() {
                 </p>
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Budget Utilization
-                </CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {Math.round((totalBudgetUsed / totalBudget) * 100)}%
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  ${totalBudgetUsed.toLocaleString()} of $
-                  {totalBudget.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
           </div>
         )}
 
@@ -445,7 +427,6 @@ export default function JiraDashboard() {
                         <TableHead>Progress</TableHead>
                         <TableHead>Tasks</TableHead>
                         <TableHead>Resources</TableHead>
-                        <TableHead>Budget</TableHead>
                         <TableHead>Completion Rate</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -491,15 +472,6 @@ export default function JiraDashboard() {
                               </div>
                             </TableCell>
                             <TableCell>{project.resourcesCount}</TableCell>
-                            <TableCell>
-                              {/* <div className="text-sm">
-                                <div>${project.budgetUsed.toLocaleString()}</div>
-                                <div className="text-muted-foreground">
-                                  of ${project.budget.toLocaleString()}
-                                </div>
-                              </div> */}
-                              -
-                            </TableCell>
                             <TableCell>
                               {/* <div className="flex items-center gap-1">
                                 {project.onTimeCompletion >= 90 ? (
