@@ -10,6 +10,6 @@ interface ProjectStatusOverview {
   total: number;
   timestamp: string;
 }
-export async function getOverviewStatusTableData() {
+export async function getOverviewStatusTableData(): Promise<ProjectStatusOverview> {
   return fetch("/api/project-status-overview").then((res) => res.json());
 }

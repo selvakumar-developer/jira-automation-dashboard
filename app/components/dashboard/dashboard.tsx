@@ -5,8 +5,6 @@ import {
   Calendar,
   CheckCircle,
   Clock,
-  Download,
-  Filter,
   PauseCircle,
   PlayCircle,
   RefreshCw,
@@ -154,19 +152,6 @@ const projectsData = [
   },
 ];
 
-// Calculate overall metrics
-const totalProjects = projectsData.length;
-const activeProjects = projectsData.filter((p) => p.status === "Active").length;
-const totalTasks = projectsData.reduce((sum, p) => sum + p.totalTasks, 0);
-const totalCompleted = projectsData.reduce((sum, p) => sum + p.completed, 0);
-const totalInProgress = projectsData.reduce((sum, p) => sum + p.inProgress, 0);
-const totalPending = projectsData.reduce((sum, p) => sum + p.pending, 0);
-const totalBlocked = projectsData.reduce((sum, p) => sum + p.blocked, 0);
-const totalResources = projectsData.reduce((sum, p) => sum + p.resources, 0);
-const totalBudget = projectsData.reduce((sum, p) => sum + p.budget, 0);
-const totalBudgetUsed = projectsData.reduce((sum, p) => sum + p.budgetUsed, 0);
-const avgCompletionRate = Math.round((totalCompleted / totalTasks) * 100);
-
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Active":
@@ -200,22 +185,32 @@ const getPriorityColor = (priority: string) => {
 export default function JiraDashboard() {
   const [timeRange, setTimeRange] = useState<string>("30d");
 
-  const { data: overviewData, isLoading: overviewDataLoading } = useQuery({
+  const {
+    data: overviewData,
+    isLoading: overviewDataLoading,
+    refetch: refetchOverviewData,
+    isRefetching: isRefetchingOverviewData,
+  } = useQuery({
     queryKey: ["overview"],
     queryFn: () => getOverviewData(),
+    refetchOnWindowFocus: false,
   });
 
   const {
     data: overviewStatusTableData,
     isLoading: overviewStatusTableDataLoading,
+    refetch: refetchOverviewStatusTableData,
+    isRefetching: isRefetchingOverviewStatusTableData,
   } = useQuery({
     queryKey: ["overview-status-table"],
     queryFn: () => getOverviewStatusTableData(),
+    refetchOnWindowFocus: false,
   });
 
-  console.log(overviewStatusTableData, "overviewStatusTableData");
-
-  console.log("Overview Data:", overviewData);
+  function handleRefreshDashboardClick() {
+    refetchOverviewData();
+    refetchOverviewStatusTableData();
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -243,20 +238,24 @@ export default function JiraDashboard() {
                 <SelectItem value="1y">Last year</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
+            {/* <Button variant="outline" size="icon">
               <Filter className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="icon">
               <Download className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
+            </Button> */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefreshDashboardClick}
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
         {/* Overview Cards */}
 
-        {overviewDataLoading ? (
+        {overviewDataLoading || isRefetchingOverviewData ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {Array.from({ length: 4 }).map((_, index) => (
               <Skeleton className="h-[150px] w-full rounded-xl" />
@@ -293,7 +292,12 @@ export default function JiraDashboard() {
                   {overviewData.totalIssues}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {avgCompletionRate}% completion rate
+                  {(
+                    (overviewData.globalTaskCounts.done /
+                      overviewData.totalIssues) *
+                    100
+                  ).toFixed(2)}
+                  % completion rate
                 </p>
               </CardContent>
             </Card>
@@ -318,7 +322,7 @@ export default function JiraDashboard() {
         )}
 
         {/* Task Status Overview */}
-        {overviewDataLoading ? (
+        {overviewDataLoading || isRefetchingOverviewData ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {Array.from({ length: 5 }).map((_, index) => (
               <Skeleton className="h-[125px] w-full rounded-xl" />
@@ -415,7 +419,8 @@ export default function JiraDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {overviewStatusTableDataLoading ? (
+                {overviewStatusTableDataLoading ||
+                isRefetchingOverviewStatusTableData ? (
                   <Skeleton className="h-[400px] w-full rounded-lg" />
                 ) : (
                   <Table>
@@ -431,7 +436,7 @@ export default function JiraDashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {overviewStatusTableData.data.map(
+                      {overviewStatusTableData?.data.map(
                         (project: ProjectInfo) => (
                           <TableRow key={project.key}>
                             <TableCell className="font-medium">
@@ -481,7 +486,7 @@ export default function JiraDashboard() {
                                 )}
                                 {project.onTimeCompletion}%
                               </div> */}
-                              -
+                              {project.progressPercentage}%
                             </TableCell>
                           </TableRow>
                         )
@@ -504,9 +509,9 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {projectsData.map((project) => (
+                    {overviewStatusTableData?.data.map((project) => (
                       <div
-                        key={project.id}
+                        key={project.key}
                         className="flex items-center justify-between"
                       >
                         <div className="flex-1">
@@ -518,7 +523,7 @@ export default function JiraDashboard() {
                         <div className="flex items-center gap-2">
                           <Users className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">
-                            {project.resources}
+                            {project.resourcesCount}
                           </span>
                         </div>
                       </div>
@@ -536,34 +541,37 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {projectsData.map((project) => {
-                      const tasksPerResource = (
-                        project.totalTasks / project.resources
-                      ).toFixed(1);
-                      const completionPerResource = (
-                        project.completed / project.resources
-                      ).toFixed(1);
-
-                      return (
-                        <div key={project.id} className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{project.name}</span>
-                            <span className="text-sm text-muted-foreground">
-                              {tasksPerResource} tasks/resource
-                            </span>
+                    {overviewStatusTableDataLoading ||
+                    isRefetchingOverviewStatusTableData ? (
+                      <Skeleton className="h-[300px] w-full rounded-lg" />
+                    ) : (
+                      overviewStatusTableData?.data.map((project) => {
+                        return (
+                          <div key={project.key} className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">
+                                {project.name}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {project.tasksPerResource} tasks/resource
+                              </span>
+                            </div>
+                            <Progress
+                              value={
+                                (project.completedTasksPerResource /
+                                  project.tasksPerResource) *
+                                100
+                              }
+                              className="h-2"
+                            />
+                            <div className="text-xs text-muted-foreground">
+                              {project.completedTasksPerResource} completed
+                              tasks per resource
+                            </div>
                           </div>
-                          <Progress
-                            value={
-                              (project.completed / project.totalTasks) * 100
-                            }
-                            className="h-2"
-                          />
-                          <div className="text-xs text-muted-foreground">
-                            {completionPerResource} completed tasks per resource
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 </CardContent>
               </Card>

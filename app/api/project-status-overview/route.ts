@@ -48,6 +48,8 @@ export interface ProjectInfo {
   completedTaskCount: number;
   resourcesCount: number;
   completionRatePercentage: number;
+  tasksPerResource: number; // Optional, can be calculated
+  completedTasksPerResource: number; // Optional, can be calculated
 }
 
 interface ApiResponse {
@@ -57,6 +59,17 @@ interface ApiResponse {
   timestamp?: string;
   error?: string;
   message?: string;
+}
+
+interface ResourceUtilization {
+  projectName: string;
+  projectKey: string;
+  tasksPerResource: number;
+  completedTasksPerResource: number;
+  totalTasks: number;
+  totalResources: number;
+  completedTasks: number;
+  utilizationEfficiency: number; // percentage of tasks completed per resource
 }
 
 // Configuration
@@ -239,6 +252,54 @@ function getProjectPriority(issues: JiraIssue[]): string {
   return highestPriority;
 }
 
+// Helper function to get unique assignees count
+function getUniqueResourceCount(issues: JiraIssue[]): number {
+  const assignees = new Set<string>();
+  issues.forEach((issue) => {
+    if (issue.fields.assignee?.accountId) {
+      assignees.add(issue.fields.assignee.accountId);
+    }
+  });
+  return assignees.size;
+}
+
+// Helper function to calculate resource utilization for a project
+function calculateResourceUtilization(
+  project: JiraProject,
+  issues: JiraIssue[]
+): ResourceUtilization {
+  const totalTasks = issues.length;
+  const totalResources = getUniqueResourceCount(issues);
+  const completedTasks = getCompletedTaskCount(issues);
+
+  // Avoid division by zero
+  const tasksPerResource =
+    totalResources > 0
+      ? parseFloat((totalTasks / totalResources).toFixed(1))
+      : 0;
+  const completedTasksPerResource =
+    totalResources > 0
+      ? parseFloat((completedTasks / totalResources).toFixed(1))
+      : 0;
+  const utilizationEfficiency =
+    tasksPerResource > 0
+      ? parseFloat(
+          ((completedTasksPerResource / tasksPerResource) * 100).toFixed(1)
+        )
+      : 0;
+
+  return {
+    projectName: project.name,
+    projectKey: project.key,
+    tasksPerResource,
+    completedTasksPerResource,
+    totalTasks,
+    totalResources,
+    completedTasks,
+    utilizationEfficiency,
+  };
+}
+
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse>> {
@@ -266,6 +327,11 @@ export async function GET(
           const completedTaskCount = getCompletedTaskCount(issues);
           const progress = calculateProgress(issues);
 
+          const resourceUtilization = calculateResourceUtilization(
+            project,
+            issues
+          );
+
           return {
             name: project.name,
             key: project.key,
@@ -276,6 +342,9 @@ export async function GET(
             completedTaskCount: completedTaskCount,
             resourcesCount: getResourceCount(issues),
             completionRatePercentage: progress,
+            tasksPerResource: resourceUtilization.tasksPerResource,
+            completedTasksPerResource:
+              resourceUtilization.completedTasksPerResource,
           };
         } catch (error) {
           // Return project with default values if there's an error
@@ -289,6 +358,8 @@ export async function GET(
             resourcesCount: 0,
             completionRatePercentage: 0,
             completedTaskCount: 0,
+            tasksPerResource: 0,
+            completedTasksPerResource: 0,
           };
         }
       })
