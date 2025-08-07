@@ -17,8 +17,11 @@ interface JiraIssue {
       name: string;
       statusCategory: {
         key: string;
+        name: string;
       };
     };
+    duedate?: string;
+    project: JiraProject;
     priority?: {
       name: string;
     };
@@ -70,6 +73,19 @@ interface ResourceUtilization {
   totalResources: number;
   completedTasks: number;
   utilizationEfficiency: number; // percentage of tasks completed per resource
+}
+
+interface ProjectMetric {
+  projectName: string;
+  completionTimes: number[];
+  totalTasks: number;
+  delayedTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+}
+
+interface ProjectMetrics {
+  [projectName: string]: ProjectMetric;
 }
 
 // Configuration
@@ -129,7 +145,8 @@ async function getAllIssues(projectKey: string): Promise<JiraIssue[]> {
     try {
       const response = await jiraFetch<JiraSearchResponse>("/search", {
         jql: `project = "${projectKey}"`,
-        fields: "status,priority,assignee,created,resolutiondate",
+        fields:
+          "status,priority,assignee,created,resolutiondate,duedate,project",
         startAt: startAt.toString(),
         maxResults: maxResults.toString(),
       });
@@ -167,6 +184,78 @@ function calculateProgress(issues: JiraIssue[]): number {
   });
 
   return Math.round((doneIssues.length / issues.length) * 100);
+}
+
+function fetchComprehensiveTaskData(issues: JiraIssue[]) {
+  // Initialize metrics for the single project
+  let totalTasks = 0;
+  let completedTasks = 0;
+  let delayedTasks = 0;
+  let inProgressTasks = 0;
+  const completionTimes: number[] = [];
+
+  const now = new Date();
+
+  issues.forEach((issue: JiraIssue) => {
+    const status = issue.fields.status.name;
+    const statusCategory = issue.fields.status.statusCategory.name;
+    const created = new Date(issue.fields.created);
+    const resolved = issue.fields.resolutiondate
+      ? new Date(issue.fields.resolutiondate)
+      : null;
+    const dueDate = issue.fields.duedate
+      ? new Date(issue.fields.duedate)
+      : null;
+
+    totalTasks++;
+
+    // For completed tasks
+    if (statusCategory === "Done" && resolved) {
+      completedTasks++;
+      const completionTime =
+        (resolved.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
+      completionTimes.push(completionTime);
+
+      // Check if it was delayed
+      if (dueDate && resolved.getTime() > dueDate.getTime()) {
+        delayedTasks++;
+      }
+    }
+
+    // For in-progress tasks, check if they're currently delayed
+    if (statusCategory === "In Progress") {
+      inProgressTasks++;
+      if (dueDate && now.getTime() > dueDate.getTime()) {
+        delayedTasks++;
+      }
+    }
+
+    // For other statuses (To Do, etc.), check if they're overdue
+    if (statusCategory !== "Done" && statusCategory !== "In Progress") {
+      if (dueDate && now.getTime() > dueDate.getTime()) {
+        delayedTasks++;
+      }
+    }
+  });
+
+  // Calculate final metrics
+  const avgCompletionTime =
+    completionTimes.length > 0
+      ? completionTimes.reduce((a, b) => a + b, 0) / completionTimes.length
+      : 0;
+
+  const completionRate =
+    totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+  return {
+    totalTasks,
+    completedTasks,
+    delayedTasks,
+    inProgressTasks,
+    avgCompletionTime: Math.round(avgCompletionTime * 10) / 10,
+    completionRate: Math.round(completionRate),
+    completionTimes,
+  };
 }
 
 // Helper function to get unique assignees (resources)
@@ -326,6 +415,8 @@ export async function GET(
           const issues = await getAllIssues(project.key);
           const completedTaskCount = getCompletedTaskCount(issues);
           const progress = calculateProgress(issues);
+          const taskCompletionRate = fetchComprehensiveTaskData(issues);
+          console.log("taskCompletionRate: ", taskCompletionRate);
 
           const resourceUtilization = calculateResourceUtilization(
             project,
