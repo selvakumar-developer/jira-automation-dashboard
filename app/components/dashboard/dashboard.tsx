@@ -589,16 +589,18 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {projectsData.map((project) => (
-                      <div key={project.id} className="space-y-2">
+                    {overviewStatusTableData?.data.map((project) => (
+                      <div key={project.key} className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="font-medium">{project.name}</span>
                           <div className="text-right">
                             <div className="text-sm font-medium">
-                              {project.avgCompletionTime} days avg
+                              {project.taskCompletionRate?.avgCompletionTime}{" "}
+                              days avg
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {project.delayedTasks} delayed tasks
+                              {project.taskCompletionRate?.delayedTasks} delayed
+                              tasks
                             </div>
                           </div>
                         </div>
@@ -607,12 +609,19 @@ export default function JiraDashboard() {
                             <div
                               className="bg-green-500 h-2 rounded"
                               style={{
-                                width: `${project.onTimeCompletion}%`,
+                                width: `${Math.min(
+                                  Math.max(
+                                    project.taskCompletionRate
+                                      ?.completionRate || 0,
+                                    0
+                                  ),
+                                  100
+                                )}%`,
                               }}
                             />
                           </div>
                           <span className="text-xs text-muted-foreground w-12">
-                            {project.onTimeCompletion}%
+                            {project.taskCompletionRate?.completionRate}%
                           </span>
                         </div>
                       </div>
@@ -630,44 +639,31 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {projectsData.map((project) => {
-                      const completionRate =
-                        (project.completed / project.totalTasks) * 100;
-                      const budgetEfficiency =
-                        ((project.budget - project.budgetUsed) /
-                          project.budget) *
-                        100;
-                      const healthScore = Math.round(
-                        (completionRate +
-                          project.onTimeCompletion +
-                          Math.max(0, budgetEfficiency)) /
-                          3
-                      );
-
+                    {overviewStatusTableData?.data.map((project) => {
                       return (
                         <div
-                          key={project.id}
+                          key={project.key}
                           className="flex items-center justify-between p-3 border rounded-lg"
                         >
                           <div>
                             <div className="font-medium">{project.name}</div>
                             <div className="text-sm text-muted-foreground">
-                              Health Score: {healthScore}/100
+                              Health Score: {project.healthScore}/100
                             </div>
                           </div>
                           <div className="text-right">
                             <div
                               className={`text-2xl font-bold ${
-                                healthScore >= 80
+                                project.healthScore >= 80
                                   ? "text-green-600"
-                                  : healthScore >= 60
+                                  : project.healthScore >= 60
                                   ? "text-yellow-600"
                                   : "text-red-600"
                               }`}
                             >
-                              {healthScore >= 80
+                              {project.healthScore >= 80
                                 ? "🟢"
-                                : healthScore >= 60
+                                : project.healthScore >= 60
                                 ? "🟡"
                                 : "🔴"}
                             </div>

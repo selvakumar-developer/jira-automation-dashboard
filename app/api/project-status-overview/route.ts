@@ -53,6 +53,8 @@ export interface ProjectInfo {
   completionRatePercentage: number;
   tasksPerResource: number; // Optional, can be calculated
   completedTasksPerResource: number; // Optional, can be calculated
+  taskCompletionRate: ProjectMetrics | null; // Optional, can be calculated
+  healthScore: number; // Optional, can be calculated
 }
 
 interface ApiResponse {
@@ -85,7 +87,41 @@ interface ProjectMetric {
 }
 
 interface ProjectMetrics {
-  [projectName: string]: ProjectMetric;
+  /** Total number of issues in the project */
+  totalTasks: number;
+
+  /** Issues marked as "Done" status category */
+  completedTasks: number;
+
+  /** Issues that missed their due date */
+  delayedTasks: number;
+
+  /** Issues currently "In Progress" status category */
+  inProgressTasks: number;
+
+  /** Average days to complete tasks (rounded to 1 decimal place) */
+  avgCompletionTime: number;
+
+  /** Percentage of completed tasks (rounded to nearest integer) */
+  completionRate: number;
+
+  /** Array of individual completion times in days */
+  completionTimes: number[];
+}
+
+interface ProjectHealthData {
+  projectName: string;
+  projectKey: string;
+  healthScore: number;
+  healthStatus: "Excellent" | "Good" | "Fair" | "Poor" | "Critical";
+  statusColor: "green" | "blue" | "yellow" | "orange" | "red";
+  breakdown: {
+    completionScore: number;
+    timelinessScore: number;
+    velocityScore: number;
+    qualityScore: number;
+  };
+  recommendations: string[];
 }
 
 // Configuration
@@ -132,6 +168,87 @@ async function jiraFetch<T>(
   }
 
   return response.json();
+}
+
+class ProjectHealthCalculator {
+  private defaultWeights = {
+    completion: 0.35,
+    timeliness: 0.3,
+    velocity: 0.2,
+    quality: 0.15,
+  };
+
+  calculateHealthScore(metrics: ProjectMetrics): {
+    overallScore: number;
+    breakdown: ProjectHealthData["breakdown"];
+  } {
+    const breakdown = {
+      completionScore: this.calculateCompletionScore(metrics),
+      timelinessScore: this.calculateTimelinessScore(metrics),
+      velocityScore: this.calculateVelocityScore(metrics),
+      qualityScore: this.calculateQualityScore(metrics),
+    };
+
+    const overallScore = Math.round(
+      breakdown.completionScore * this.defaultWeights.completion +
+        breakdown.timelinessScore * this.defaultWeights.timeliness +
+        breakdown.velocityScore * this.defaultWeights.velocity +
+        breakdown.qualityScore * this.defaultWeights.quality
+    );
+
+    return { overallScore, breakdown };
+  }
+
+  private calculateCompletionScore(metrics: ProjectMetrics): number {
+    return metrics.totalTasks === 0 ? 0 : Math.min(metrics.completionRate, 100);
+  }
+
+  private calculateTimelinessScore(metrics: ProjectMetrics): number {
+    if (metrics.totalTasks === 0) return 100;
+
+    const delayRate = (metrics.delayedTasks / metrics.totalTasks) * 100;
+
+    if (delayRate === 0) return 100;
+    if (delayRate <= 5) return 90;
+    if (delayRate <= 10) return 80;
+    if (delayRate <= 20) return 60;
+    if (delayRate <= 30) return 40;
+    if (delayRate <= 50) return 20;
+    return 10;
+  }
+
+  private calculateVelocityScore(metrics: ProjectMetrics): number {
+    if (metrics.completionTimes.length === 0) return 50;
+
+    const avgTime = metrics.avgCompletionTime;
+
+    if (avgTime <= 3) return 100;
+    if (avgTime <= 7) return 90;
+    if (avgTime <= 14) return 80;
+    if (avgTime <= 21) return 60;
+    if (avgTime <= 30) return 40;
+    if (avgTime <= 45) return 20;
+    return 10;
+  }
+
+  private calculateQualityScore(metrics: ProjectMetrics): number {
+    if (metrics.completionTimes.length <= 1) return 50;
+
+    const times = metrics.completionTimes;
+    const mean = metrics.avgCompletionTime;
+    const variance =
+      times.reduce((sum, time) => sum + Math.pow(time - mean, 2), 0) /
+      times.length;
+    const stdDev = Math.sqrt(variance);
+    const coefficientOfVariation = mean > 0 ? (stdDev / mean) * 100 : 0;
+
+    if (coefficientOfVariation <= 20) return 100;
+    if (coefficientOfVariation <= 40) return 80;
+    if (coefficientOfVariation <= 60) return 60;
+    if (coefficientOfVariation <= 80) return 40;
+    if (coefficientOfVariation <= 100) return 20;
+    return 10;
+  }
 }
 
 // Helper function to get all issues with pagination
@@ -407,7 +524,7 @@ export async function GET(
 
     // Get all projects
     const projects = await jiraFetch<JiraProject[]>("/project");
-
+    const healthCalculator = new ProjectHealthCalculator();
     const projectsInfo: ProjectInfo[] = await Promise.all(
       projects.map(async (project): Promise<ProjectInfo> => {
         try {
@@ -416,7 +533,8 @@ export async function GET(
           const completedTaskCount = getCompletedTaskCount(issues);
           const progress = calculateProgress(issues);
           const taskCompletionRate = fetchComprehensiveTaskData(issues);
-          console.log("taskCompletionRate: ", taskCompletionRate);
+          const { overallScore } =
+            healthCalculator.calculateHealthScore(taskCompletionRate);
 
           const resourceUtilization = calculateResourceUtilization(
             project,
@@ -436,6 +554,8 @@ export async function GET(
             tasksPerResource: resourceUtilization.tasksPerResource,
             completedTasksPerResource:
               resourceUtilization.completedTasksPerResource,
+            taskCompletionRate: taskCompletionRate,
+            healthScore: overallScore,
           };
         } catch (error) {
           // Return project with default values if there's an error
@@ -451,6 +571,8 @@ export async function GET(
             completedTaskCount: 0,
             tasksPerResource: 0,
             completedTasksPerResource: 0,
+            taskCompletionRate: null,
+            healthScore: 0,
           };
         }
       })
