@@ -687,23 +687,10 @@ export default function JiraDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {projectsData.map((project) => {
-                    const startDate = new Date(project.startDate);
-                    const endDate = new Date(project.endDate);
-                    const today = new Date();
-                    const totalDuration =
-                      endDate.getTime() - startDate.getTime();
-                    const elapsed = today.getTime() - startDate.getTime();
-                    const timeProgress = Math.min(
-                      100,
-                      Math.max(0, (elapsed / totalDuration) * 100)
-                    );
-                    const taskProgress =
-                      (project.completed / project.totalTasks) * 100;
-
+                  {overviewStatusTableData?.data.map((project) => {
                     return (
                       <div
-                        key={project.id}
+                        key={project.key}
                         className="space-y-3 p-4 border rounded-lg"
                       >
                         <div className="flex justify-between items-center">
@@ -718,54 +705,63 @@ export default function JiraDashboard() {
                             <span className="text-muted-foreground">
                               Start Date:
                             </span>
-                            <div>{startDate.toLocaleDateString()}</div>
+                            <div>{project.timeline?.startDate}</div>
                           </div>
                           <div>
                             <span className="text-muted-foreground">
                               End Date:
                             </span>
-                            <div>{endDate.toLocaleDateString()}</div>
+                            <div>{project.timeline?.endDate}</div>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span>Time Progress</span>
-                            <span>{Math.round(timeProgress)}%</span>
+                            <span>{project.timeline?.timeProgress}%</span>
                           </div>
-                          <Progress value={timeProgress} className="h-2" />
+                          <Progress
+                            value={project.timeline?.timeProgress}
+                            className="h-2"
+                          />
                         </div>
 
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span>Task Progress</span>
-                            <span>{Math.round(taskProgress)}%</span>
+                            <span>{project.timeline?.taskProgress}%</span>
                           </div>
-                          <Progress value={taskProgress} className="h-2" />
+                          <Progress
+                            value={project.timeline?.taskProgress}
+                            className="h-2"
+                          />
                         </div>
 
                         <div className="flex justify-between items-center text-sm">
                           <span
                             className={`flex items-center gap-1 ${
-                              taskProgress >= timeProgress
-                                ? "text-green-600"
-                                : "text-red-600"
+                              project.timeline?.scheduleStatus ===
+                              "Behind Schedule"
+                                ? "text-red-600"
+                                : "text-green-600"
                             }`}
                           >
-                            {taskProgress >= timeProgress ? (
-                              <>
-                                <TrendingUp className="h-3 w-3" />
-                                On Track
-                              </>
-                            ) : (
+                            {project.timeline?.scheduleStatus ===
+                            "Behind Schedule" ? (
                               <>
                                 <TrendingDown className="h-3 w-3" />
                                 Behind Schedule
                               </>
+                            ) : (
+                              <>
+                                <TrendingUp className="h-3 w-3" />
+                                On Track
+                              </>
                             )}
                           </span>
                           <span className="text-muted-foreground">
-                            {project.resources} resources assigned
+                            {project.timeline?.resourcesAssigned} resources
+                            assigned
                           </span>
                         </div>
                       </div>

@@ -55,6 +55,7 @@ export interface ProjectInfo {
   completedTasksPerResource: number; // Optional, can be calculated
   taskCompletionRate: ProjectMetrics | null; // Optional, can be calculated
   healthScore: number; // Optional, can be calculated
+  timeline: ProjectTimelineData | null; // Optional, can be calculated
 }
 
 interface ApiResponse {
@@ -122,6 +123,22 @@ interface ProjectHealthData {
     qualityScore: number;
   };
   recommendations: string[];
+}
+
+interface ProjectTimelineData {
+  projectName: string;
+  projectKey: string;
+  startDate: string;
+  endDate: string;
+  priority: "High" | "Medium" | "Low";
+  timeProgress: number;
+  taskProgress: number;
+  scheduleStatus: "On Track" | "Behind Schedule" | "Ahead of Schedule";
+  resourcesAssigned: number;
+  totalTasks: number;
+  completedTasks: number;
+  projectDuration: number; // in days
+  remainingDays: number;
 }
 
 // Configuration
@@ -506,6 +523,123 @@ function calculateResourceUtilization(
   };
 }
 
+// Format date for display (DD/MM/YYYY)
+function formatDateForDisplay(dateString: string): string {
+  const date = new Date(dateString);
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function calculateTimelineData(
+  project: JiraProject,
+  issues: JiraIssue[]
+): ProjectTimelineData {
+  const now = new Date();
+
+  // Get project dates from issues
+  const createdDates = issues.map((issue) => new Date(issue.fields.created));
+  const dueDates = issues
+    .filter((issue) => issue.fields.duedate)
+    .map((issue) => new Date(issue.fields.duedate!));
+
+  // Determine project start and end dates
+  const startDate =
+    createdDates.length > 0
+      ? new Date(Math.min(...createdDates.map((d) => d.getTime())))
+      : now;
+
+  const endDate =
+    dueDates.length > 0
+      ? new Date(Math.max(...dueDates.map((d) => d.getTime())))
+      : new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000); // Default 90 days from now
+
+  // Calculate time progress
+  const totalProjectDays = Math.max(
+    1,
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const elapsedDays = Math.max(
+    0,
+    (now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const timeProgress = Math.min(
+    100,
+    Math.max(0, Math.round((elapsedDays / totalProjectDays) * 100))
+  );
+
+  // Calculate task progress
+  const totalTasks = issues.length;
+  const completedTasks = issues.filter(
+    (issue) => issue.fields.status.statusCategory.key === "done"
+  ).length;
+  const taskProgress =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // Determine schedule status
+  let scheduleStatus: ProjectTimelineData["scheduleStatus"] = "On Track";
+  if (timeProgress > taskProgress + 10) {
+    scheduleStatus = "Behind Schedule";
+  } else if (taskProgress > timeProgress + 15) {
+    scheduleStatus = "Ahead of Schedule";
+  }
+
+  // Get project priority (highest priority among issues)
+  const priorities = issues
+    .filter((issue) => issue.fields.priority)
+    .map((issue) => issue.fields.priority!.name);
+
+  const priorityOrder: Record<string, number> = {
+    Highest: 5,
+    High: 4,
+    Medium: 3,
+    Low: 2,
+    Lowest: 1,
+  };
+
+  let projectPriority: ProjectTimelineData["priority"] = "Medium";
+  let highestPriorityValue = 0;
+
+  priorities.forEach((priority) => {
+    const value = priorityOrder[priority] || 3;
+    if (value > highestPriorityValue) {
+      highestPriorityValue = value;
+      if (value >= 4) projectPriority = "High";
+      else if (value === 3) projectPriority = "Medium";
+      else projectPriority = "Low";
+    }
+  });
+
+  // Count unique resources
+  const uniqueAssignees = new Set(
+    issues
+      .filter((issue) => issue.fields.assignee?.accountId)
+      .map((issue) => issue.fields.assignee!.accountId)
+  );
+
+  const remainingDays = Math.max(
+    0,
+    Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  );
+
+  return {
+    projectName: project.name,
+    projectKey: project.key,
+    startDate: startDate.toISOString().split("T")[0], // Format: YYYY-MM-DD
+    endDate: endDate.toISOString().split("T")[0],
+    priority: projectPriority,
+    timeProgress,
+    taskProgress,
+    scheduleStatus,
+    resourcesAssigned: uniqueAssignees.size,
+    totalTasks,
+    completedTasks,
+    projectDuration: Math.round(totalProjectDays),
+    remainingDays,
+  };
+}
+
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<ApiResponse>> {
@@ -541,6 +675,8 @@ export async function GET(
             issues
           );
 
+          const timeline = calculateTimelineData(project, issues);
+
           return {
             name: project.name,
             key: project.key,
@@ -556,6 +692,11 @@ export async function GET(
               resourceUtilization.completedTasksPerResource,
             taskCompletionRate: taskCompletionRate,
             healthScore: overallScore,
+            timeline: {
+              ...timeline,
+              startDate: formatDateForDisplay(timeline.startDate),
+              endDate: formatDateForDisplay(timeline.endDate),
+            },
           };
         } catch (error) {
           // Return project with default values if there's an error
@@ -573,6 +714,7 @@ export async function GET(
             completedTasksPerResource: 0,
             taskCompletionRate: null,
             healthScore: 0,
+            timeline: null,
           };
         }
       })
