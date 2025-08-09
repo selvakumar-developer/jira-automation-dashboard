@@ -509,25 +509,30 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {overviewStatusTableData?.data.map((project) => (
-                      <div
-                        key={project.key}
-                        className="flex items-center justify-between"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium">{project.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {project.status}
+                    {overviewStatusTableDataLoading ||
+                    isRefetchingOverviewStatusTableData ? (
+                      <Skeleton className="h-[300px] w-full rounded-lg" />
+                    ) : (
+                      overviewStatusTableData?.data.map((project) => (
+                        <div
+                          key={project.key}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex-1">
+                            <div className="font-medium">{project.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {project.status}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {project.resourcesCount}
+                            </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">
-                            {project.resourcesCount}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -589,43 +594,48 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {overviewStatusTableData?.data.map((project) => (
-                      <div key={project.key} className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">{project.name}</span>
-                          <div className="text-right">
-                            <div className="text-sm font-medium">
-                              {project.taskCompletionRate?.avgCompletionTime}{" "}
-                              days avg
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {project.taskCompletionRate?.delayedTasks} delayed
-                              tasks
+                    {overviewStatusTableDataLoading ||
+                    isRefetchingOverviewStatusTableData ? (
+                      <Skeleton className="h-[300px] w-full rounded-lg" />
+                    ) : (
+                      overviewStatusTableData?.data.map((project) => (
+                        <div key={project.key} className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-medium">{project.name}</span>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">
+                                {project.taskCompletionRate?.avgCompletionTime}{" "}
+                                days avg
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {project.taskCompletionRate?.delayedTasks}{" "}
+                                delayed tasks
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <div className="flex-1 bg-green-100 h-2 rounded">
-                            <div
-                              className="bg-green-500 h-2 rounded"
-                              style={{
-                                width: `${Math.min(
-                                  Math.max(
-                                    project.taskCompletionRate
-                                      ?.completionRate || 0,
-                                    0
-                                  ),
-                                  100
-                                )}%`,
-                              }}
-                            />
+                          <div className="flex gap-2">
+                            <div className="flex-1 bg-green-100 h-2 rounded">
+                              <div
+                                className="bg-green-500 h-2 rounded"
+                                style={{
+                                  width: `${Math.min(
+                                    Math.max(
+                                      project.taskCompletionRate
+                                        ?.completionRate || 0,
+                                      0
+                                    ),
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-12">
+                              {project.taskCompletionRate?.completionRate}%
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground w-12">
-                            {project.taskCompletionRate?.completionRate}%
-                          </span>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -639,38 +649,43 @@ export default function JiraDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {overviewStatusTableData?.data.map((project) => {
-                      return (
-                        <div
-                          key={project.key}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div>
-                            <div className="font-medium">{project.name}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Health Score: {project.healthScore}/100
+                    {overviewStatusTableDataLoading ||
+                    isRefetchingOverviewStatusTableData ? (
+                      <Skeleton className="h-[300px] w-full rounded-lg" />
+                    ) : (
+                      overviewStatusTableData?.data.map((project) => {
+                        return (
+                          <div
+                            key={project.key}
+                            className="flex items-center justify-between p-3 border rounded-lg"
+                          >
+                            <div>
+                              <div className="font-medium">{project.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                Health Score: {project.healthScore}/100
+                              </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <div
-                              className={`text-2xl font-bold ${
-                                project.healthScore >= 80
-                                  ? "text-green-600"
+                            <div className="text-right">
+                              <div
+                                className={`text-2xl font-bold ${
+                                  project.healthScore >= 80
+                                    ? "text-green-600"
+                                    : project.healthScore >= 60
+                                    ? "text-yellow-600"
+                                    : "text-red-600"
+                                }`}
+                              >
+                                {project.healthScore >= 80
+                                  ? "🟢"
                                   : project.healthScore >= 60
-                                  ? "text-yellow-600"
-                                  : "text-red-600"
-                              }`}
-                            >
-                              {project.healthScore >= 80
-                                ? "🟢"
-                                : project.healthScore >= 60
-                                ? "🟡"
-                                : "🔴"}
+                                  ? "🟡"
+                                  : "🔴"}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -687,86 +702,91 @@ export default function JiraDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {overviewStatusTableData?.data.map((project) => {
-                    return (
-                      <div
-                        key={project.key}
-                        className="space-y-3 p-4 border rounded-lg"
-                      >
-                        <div className="flex justify-between items-center">
-                          <h4 className="font-medium">{project.name}</h4>
-                          <Badge variant={getPriorityColor(project.priority)}>
-                            {project.priority}
-                          </Badge>
-                        </div>
+                  {overviewStatusTableDataLoading ||
+                  isRefetchingOverviewStatusTableData ? (
+                    <Skeleton className="h-[200px] w-full rounded-lg" />
+                  ) : (
+                    overviewStatusTableData?.data.map((project) => {
+                      return (
+                        <div
+                          key={project.key}
+                          className="space-y-3 p-4 border rounded-lg"
+                        >
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium">{project.name}</h4>
+                            <Badge variant={getPriorityColor(project.priority)}>
+                              {project.priority}
+                            </Badge>
+                          </div>
 
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">
-                              Start Date:
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">
+                                Start Date:
+                              </span>
+                              <div>{project.timeline?.startDate}</div>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">
+                                End Date:
+                              </span>
+                              <div>{project.timeline?.endDate}</div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Time Progress</span>
+                              <span>{project.timeline?.timeProgress}%</span>
+                            </div>
+                            <Progress
+                              value={project.timeline?.timeProgress}
+                              className="h-2"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Task Progress</span>
+                              <span>{project.timeline?.taskProgress}%</span>
+                            </div>
+                            <Progress
+                              value={project.timeline?.taskProgress}
+                              className="h-2"
+                            />
+                          </div>
+
+                          <div className="flex justify-between items-center text-sm">
+                            <span
+                              className={`flex items-center gap-1 ${
+                                project.timeline?.scheduleStatus ===
+                                "Behind Schedule"
+                                  ? "text-red-600"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {project.timeline?.scheduleStatus ===
+                              "Behind Schedule" ? (
+                                <>
+                                  <TrendingDown className="h-3 w-3" />
+                                  Behind Schedule
+                                </>
+                              ) : (
+                                <>
+                                  <TrendingUp className="h-3 w-3" />
+                                  On Track
+                                </>
+                              )}
                             </span>
-                            <div>{project.timeline?.startDate}</div>
-                          </div>
-                          <div>
                             <span className="text-muted-foreground">
-                              End Date:
+                              {project.timeline?.resourcesAssigned} resources
+                              assigned
                             </span>
-                            <div>{project.timeline?.endDate}</div>
                           </div>
                         </div>
-
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Time Progress</span>
-                            <span>{project.timeline?.timeProgress}%</span>
-                          </div>
-                          <Progress
-                            value={project.timeline?.timeProgress}
-                            className="h-2"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Task Progress</span>
-                            <span>{project.timeline?.taskProgress}%</span>
-                          </div>
-                          <Progress
-                            value={project.timeline?.taskProgress}
-                            className="h-2"
-                          />
-                        </div>
-
-                        <div className="flex justify-between items-center text-sm">
-                          <span
-                            className={`flex items-center gap-1 ${
-                              project.timeline?.scheduleStatus ===
-                              "Behind Schedule"
-                                ? "text-red-600"
-                                : "text-green-600"
-                            }`}
-                          >
-                            {project.timeline?.scheduleStatus ===
-                            "Behind Schedule" ? (
-                              <>
-                                <TrendingDown className="h-3 w-3" />
-                                Behind Schedule
-                              </>
-                            ) : (
-                              <>
-                                <TrendingUp className="h-3 w-3" />
-                                On Track
-                              </>
-                            )}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {project.timeline?.resourcesAssigned} resources
-                            assigned
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>
