@@ -10,6 +10,9 @@ import {
 import { Suspense } from "react";
 import JiraDashboard from "./components/dashboard/dashboard";
 
+// Example in App Router
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   const queryClient = new QueryClient();
 
